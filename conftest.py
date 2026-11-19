@@ -1,5 +1,8 @@
 """Shared fixtures. Spark tests are skipped automatically when pyspark/delta are absent."""
 
+import os
+import sys
+
 import pytest
 
 
@@ -8,6 +11,10 @@ def spark(tmp_path_factory):
     pytest.importorskip("pyspark")
     delta = pytest.importorskip("delta")
     from pyspark.sql import SparkSession
+
+    # workers must run the same interpreter as the driver
+    os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
+    os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
     wh = tmp_path_factory.mktemp("warehouse")
     builder = (

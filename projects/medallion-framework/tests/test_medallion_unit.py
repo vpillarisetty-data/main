@@ -61,9 +61,10 @@ def test_suite_predicates():
 
 def test_scd1_merge_has_sequence_guard_and_delete():
     sql = MergeBuilder("t1", ["id"], "seq", ["id", "v", "seq", "op"]).scd1("src", "op = 'D'")
-    assert "WHEN MATCHED AND (op = 'D') AND s.`seq` > t.`seq` THEN DELETE" in sql
+    assert "coalesce((op = 'D'), false) AS `__is_delete`" in sql
+    assert "WHEN MATCHED AND s.`__is_delete` AND s.`seq` > t.`seq` THEN DELETE" in sql
     assert "WHEN MATCHED AND s.`seq` > t.`seq` THEN UPDATE" in sql
-    assert "WHEN NOT MATCHED AND NOT (op = 'D') THEN INSERT" in sql
+    assert "WHEN NOT MATCHED AND NOT s.`__is_delete` THEN INSERT" in sql
     assert "row_number() OVER (PARTITION BY `id` ORDER BY `seq` DESC)" in sql
 
 

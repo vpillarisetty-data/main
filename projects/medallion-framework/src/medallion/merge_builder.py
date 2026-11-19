@@ -45,11 +45,18 @@ class MergeBuilder:
     def _newer(self) -> str:
         return f"s.{_q(self.sequence_by)} > t.{_q(self.sequence_by)}"
 
-    def dedup_source_sql(self, source_view: str) -> str:
-        """Keep only the latest record per key within the incoming batch."""
+    def dedup_source_sql(self, source_view: str, delete_condition: str | None = None) -> str:
+        """Keep only the latest record per key within the incoming batch.
+
+        The delete condition is evaluated here, against the source only, and exposed as
+        ``__is_delete``: inside the MERGE an unqualified ``op = 'D'`` would be ambiguous.
+        """
         part = ", ".join(_q(k) for k in self.keys)
+        cols = ", ".join(_q(c) for c in self.columns)  # explicit list: portable beyond Databricks SQL
+        if delete_condition:
+            cols += f", coalesce(({delete_condition}), false) AS `__is_delete`"
         return (
-            f"SELECT * EXCEPT (_rn) FROM (\n"
+            f"SELECT {cols} FROM (\n"
             f"  SELECT *, row_number() OVER (PARTITION BY {part} ORDER BY {_q(self.sequence_by)} DESC) AS _rn\n"
             f"  FROM {source_view}\n"
             f") WHERE _rn = 1"
@@ -62,13 +69,13 @@ class MergeBuilder:
         vals = ", ".join(f"s.{_q(c)}" for c in self.columns)
         lines = [
             f"MERGE INTO {self.target} AS t",
-            f"USING ({self.dedup_source_sql(source_view)}) AS s",
+            f"USING ({self.dedup_source_sql(source_view, delete_condition)}) AS s",
             f"ON {self._on()}",
         ]
         if delete_condition:
-            lines.append(f"WHEN MATCHED AND ({delete_condition}) AND {self._newer()} THEN DELETE")
+            lines.append(f"WHEN MATCHED AND s.`__is_delete` AND {self._newer()} THEN DELETE")
         lines.append(f"WHEN MATCHED AND {self._newer()} THEN UPDATE SET\n    {set_clause}")
-        not_deleted = f" AND NOT ({delete_condition})" if delete_condition else ""
+        not_deleted = " AND NOT s.`__is_delete`" if delete_condition else ""
         lines.append(f"WHEN NOT MATCHED{not_deleted} THEN INSERT ({cols}) VALUES ({vals})")
         return "\n".join(lines)
 

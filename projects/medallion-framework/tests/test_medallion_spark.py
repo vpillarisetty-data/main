@@ -52,7 +52,7 @@ def test_scd2_history(spark):
     apply([(1, "platinum", 2, "U"), (2, "silver", 3, "U")])  # id=2 unchanged -> no new version
     apply([(1, "gold", 1, "U")])  # late replay of old version -> ignored
 
-    rows = sorted((r.id, r.v, r.__start_at, r.__end_at, r.__is_current) for r in spark.table("dim_t").collect())
+    rows = sorted((r["id"], r["v"], r["__start_at"], r["__end_at"], r["__is_current"]) for r in spark.table("dim_t").collect())
     assert rows == [
         (1, "gold", 1, 2, False),
         (1, "platinum", 2, None, True),
