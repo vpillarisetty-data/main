@@ -1,0 +1,28 @@
+# Copy to .github/workflows/: blocks merging a contract change whose version bump
+# does not match its impact, and posts the change table on the PR.
+name: data-contract-check
+on:
+  pull_request:
+    paths: ["contracts/**.yaml"]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pyyaml && pip install -e .
+      - name: Diff every changed contract against the base branch
+        run: |
+          status=0
+          for f in $(git diff --name-only origin/${{ github.base_ref }} -- 'contracts/*.yaml'); do
+            [ -f "$f" ] || continue
+            git show origin/${{ github.base_ref }}:"$f" > /tmp/base.yaml 2>/dev/null || continue
+            python -m contractkit.cli diff /tmp/base.yaml "$f" --format markdown >> report.md || status=1
+          done
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
