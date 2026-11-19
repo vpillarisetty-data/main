@@ -1,0 +1,16 @@
+id: network.usage_daily
+version: 1.0.0
+owner: network-analytics-eng
+dataset: telco.gold.network_usage_daily
+description: Daily voice/data usage and call-drop KPIs per cell.
+sla: {freshness_minutes: 60, completeness_pct: 99.5}
+schema:
+  - {name: usage_date,    type: date,   nullable: false}
+  - {name: cell_id,       type: string, nullable: false}
+  - {name: region,        type: string, nullable: false, enum: [NSW, VIC, QLD, WA]}
+  - {name: technology,    type: string, nullable: false, enum: [4G, 5G]}
+  - {name: voice_calls,   type: bigint, nullable: false}
+  - {name: voice_minutes, type: double, nullable: false}
+  - {name: data_mb,       type: double, nullable: false}
+  - {name: dropped_calls, type: bigint, nullable: false}
+  - {name: drop_rate,     type: double, nullable: false, description: dropped / voice calls}

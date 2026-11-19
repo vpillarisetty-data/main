@@ -1,0 +1,19 @@
+id: hospitality.reservation
+version: 1.0.0
+owner: hospitality-data-eng
+dataset: hosp.silver.reservations
+description: One row per reservation, latest version from the PMS.
+sla: {freshness_minutes: 15}
+schema:
+  - {name: reservation_id, type: string, nullable: false, unique: true}
+  - {name: guest_id,       type: string, nullable: false}
+  - {name: property_code,  type: string, nullable: false}
+  - {name: check_in,       type: date,   nullable: false}
+  - {name: check_out,      type: date,   nullable: false}
+  - {name: rooms,          type: int,    nullable: false}
+  - {name: room_rate,      type: "decimal(10,2)", nullable: false}
+  - {name: status,         type: string, nullable: false, enum: [BOOKED, CANCELLED, CHECKED_OUT]}
+  - {name: channel,        type: string, nullable: false, enum: [DIRECT, OTA, GDS]}
+  - {name: loyalty_tier,   type: string, enum: [MEMBER, SILVER, GOLD, PLATINUM]}
+  - {name: guest_email,    type: string, pii: true}
+  - {name: card_on_file,   type: string, pii: true}

@@ -1,0 +1,29 @@
+# Call-detail records from network switches via Kafka. Switches re-send corrected CDRs (re-rating)
+# with a higher event_seq, replays deliver old versions late, and cancelled CDRs arrive as op = 'D'.
+name: cdr_usage
+owner: network-analytics-eng
+tags: {domain: network, pii: "true", sla_minutes: "60"}
+source:
+  format: kafka
+  location: cdr-events
+  options: {kafka.bootstrap.servers: "broker-1:9092"}
+bronze_table: telco.bronze.cdr_raw
+silver:
+  table: telco.silver.cdr
+  keys: [cdr_id]
+  sequence_by: event_seq
+  delete_condition: "op = 'D'"
+  quarantine_table: telco.silver.cdr_quarantine
+  select: [cdr_id, msisdn, imsi, imei, cell_id, call_type, start_ts, duration_s, data_mb, release_cause, event_seq, op]
+  expectations:
+    - {name: cdr_id_present,        expr: "cdr_id IS NOT NULL",                          action: fail}
+    - {name: msisdn_e164,           expr: "msisdn RLIKE '^[+][1-9][0-9]{7,14}$'",        action: quarantine}
+    - {name: known_call_type,       expr: "call_type IN ('VOICE', 'SMS', 'DATA')",        action: quarantine}
+    - {name: non_negative_duration, expr: "duration_s >= 0",                             action: drop}
+    - {name: has_cell,              expr: "cell_id IS NOT NULL",                         action: warn}
+gold:
+  table: telco.gold.subscriber_cell_history   # SCD2: where each subscriber is served from, over time
+  scd_type: 2
+  keys: [msisdn]
+  sequence_by: event_seq
+  track_columns: [cell_id]

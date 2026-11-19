@@ -1,0 +1,32 @@
+# Reservation events from the property-management systems of 120 hotels, streamed via Kafka.
+# Guests modify stays (dates, rates) many times; PMS replays old versions after outages; GDPR
+# erasure requests arrive as op = 'D'. Contract-derived rules (contracts/reservation.v1.yaml) are
+# appended to these expectations at load time, so the contract and the pipeline cannot drift apart.
+name: hotel_reservations
+owner: hospitality-data-eng
+tags: {domain: reservations, pii: "true", sla_minutes: "15"}
+source:
+  format: kafka
+  location: pms-reservations
+bronze_table: hosp.bronze.reservations_raw
+silver:
+  table: hosp.silver.reservations
+  keys: [reservation_id]
+  sequence_by: modified_seq
+  delete_condition: "op = 'D'"
+  quarantine_table: hosp.silver.reservations_quarantine
+  select: [reservation_id, guest_id, property_code, check_in, check_out, rooms, room_rate, status, channel,
+           loyalty_tier, loyalty_number, guest_email, guest_phone, card_on_file, passport_no, special_requests,
+           modified_seq, op]
+  expectations:
+    - {name: stay_has_nights,  expr: "check_out > check_in",              action: quarantine}
+    - {name: rate_non_negative, expr: "room_rate >= 0",                   action: quarantine}
+    - {name: rooms_positive,   expr: "rooms BETWEEN 1 AND 9",             action: quarantine}
+    - {name: has_email,        expr: "guest_email IS NOT NULL",           action: warn}
+gold:
+  table: hosp.gold.guest_loyalty_history     # SCD2: loyalty tier over time (upgrade/downgrade analytics)
+  scd_type: 2
+  keys: [guest_id]
+  sequence_by: modified_seq
+  track_columns: [loyalty_tier]
+  cluster_by: [guest_id]

@@ -12,6 +12,7 @@ deterministic SHA-256 tokens so joins still work).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -27,6 +28,7 @@ MASK_EXPR: dict[str, str] = {
     "email": "regexp_replace(v, '^[^@]+', '****')",
     "phone": "concat('***-***-', right(regexp_replace(v, '[^0-9]', ''), 4))",
     "card_security_code": "NULL",
+    "device_id": "concat(substr(v, 1, 8), '*******')",  # keep the TAC (device model), hide the serial
     "date_of_birth": "concat(substr(CAST(v AS STRING), 1, 4), '-**-**')",
     "free_text": (
         f"regexp_replace(regexp_replace(regexp_replace(v, '{_PAN_RX}', '[PAN]'), "
@@ -87,3 +89,24 @@ def generate_policies(
     if review:
         out += ["", "-- NEEDS HUMAN REVIEW (below confidence threshold, not applied):", *review]
     return "\n".join(out) + "\n"
+
+
+def generate_masked_view(
+    table: str, view: str, columns: Sequence[str], classifications: Sequence[ColumnClassification],
+    min_confidence: float = 0.7,
+) -> str:
+    """Masked view for platforms without Unity Catalog column masks (Azure Synapse, OSS Spark, Hive).
+
+    Uses the same mask expressions as the UC functions, so behaviour is identical everywhere.
+    """
+    by_col = {c.column: c for c in classifications if c.is_pii and c.confidence >= min_confidence}
+    exprs = []
+    for col in columns:
+        c = by_col.get(col)
+        if c is None:
+            exprs.append(f"`{col}`")
+            continue
+        key = "free_text" if c.embedded else c.category
+        body = re.sub(r"\bv\b", f"`{col}`", MASK_EXPR.get(key, _DEFAULT_MASK))
+        exprs.append(f"{body} AS `{col}`")
+    return f"CREATE OR REPLACE VIEW {view} AS SELECT\n  " + ",\n  ".join(exprs) + f"\nFROM {table}"

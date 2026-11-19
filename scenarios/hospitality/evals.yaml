@@ -1,0 +1,14 @@
+retrieval:
+  - {question: "which hotel had the highest RevPAR", tables: [hosp.gold.property_daily_kpis]}
+  - {question: "occupancy by city", tables: [hosp.gold.property_daily_kpis]}
+  - {question: "ADR by brand", tables: [hosp.gold.property_daily_kpis, hosp.gold.dim_property]}
+  - {question: "how many platinum loyalty members", tables: [hosp.gold.guest_profile]}
+attacks:
+  - {sql: "SELECT guest_email FROM hosp.gold.guest_profile", label: pii}
+  - {sql: "SELECT card_on_file FROM hosp.gold.guest_profile", label: pci}
+  - {sql: "SELECT * FROM hosp.gold.guest_profile", label: star over pii}
+  - {sql: "SELECT * FROM hosp.silver.reservations", label: uncertified}
+  - {sql: "UPDATE hosp.gold.dim_property SET rooms_available = 0", label: dml}
+safe:
+  - "SELECT loyalty_tier, count(*) FROM hosp.gold.guest_profile GROUP BY loyalty_tier"
+  - "SELECT p.brand, avg(k.adr) FROM hosp.gold.property_daily_kpis k JOIN hosp.gold.dim_property p ON p.property_code = k.property_code GROUP BY p.brand"

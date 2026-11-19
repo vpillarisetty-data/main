@@ -133,3 +133,6 @@ def test_real_table_with_checkpoint(spark, tmp_path):
     assert snap.version == 15
     assert sum(f.num_records for f in snap.files.values()) == spark.read.format("delta").load(path).count()
     assert len(snap.tombstones) == 1
+    # history before the checkpoint is still visible to write-pattern rules
+    assert sum(1 for c in snap.commits if c.get("operation") == "WRITE") == 15
+    assert sum(1 for c in snap.commits if c.get("operation") == "DELETE") == 1

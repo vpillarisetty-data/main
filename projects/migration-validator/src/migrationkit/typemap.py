@@ -167,8 +167,20 @@ def map_type(dialect: str, type_str: str) -> TypeMapping:
 
 
 # ---------------------------------------------------------------- DDL conversion
-_CREATE = re.compile(r"create\s+table\s+([\w.\[\]\"`]+)\s*\((.*)\)\s*[^)]*$", re.I | re.S)
+_CREATE_HEAD = re.compile(r"create\s+(?:external\s+)?table\s+(?:if\s+not\s+exists\s+)?([\w.\[\]\"`$#]+)\s*\(", re.I)
+_PARTITIONED = re.compile(r"partitioned\s+by\s*\(", re.I)
 _CONSTRAINT = re.compile(r"^(constraint|primary\s+key|foreign\s+key|unique|check|index|key)\b", re.I)
+
+
+def _balanced(text: str, open_idx: int) -> tuple[str, int]:
+    """Return the text inside the parenthesis opening at ``open_idx`` and the index after its close."""
+    depth = 0
+    for i in range(open_idx, len(text)):
+        depth += text[i] == "("
+        depth -= text[i] == ")"
+        if depth == 0:
+            return text[open_idx + 1:i], i + 1
+    raise ValueError("unbalanced parentheses in DDL")
 
 
 def _split_top(body: str) -> list[str]:
@@ -187,7 +199,7 @@ def _split_top(body: str) -> list[str]:
 
 _COL_TAIL = re.compile(
     r"\s(not\s+null|null|default|identity|constraint|primary\s+key|generated|collate|check|references|"
-    r"unique|character\s+set|format|compress|sparse)\b", re.I)
+    r"unique|character\s+set|format|compress|sparse|comment)\b", re.I)
 
 
 def _type_end(tokens: str) -> tuple[str, bool]:
@@ -198,30 +210,50 @@ def _type_end(tokens: str) -> tuple[str, bool]:
     return type_str.strip(), bool(re.search(r"\snot\s+null\b|\sprimary\s+key\b", low))
 
 
-def convert_ddl(dialect: str, ddl: str, target_table: str | None = None) -> tuple[str, list[tuple[str, TypeMapping]]]:
-    statements = [s for s in re.split(r";\s*(?:\n|$)|\n\s*go\s*\n", ddl, flags=re.I) if s.strip()]
-    outputs, risks = [], []
-    for stmt in statements:
-        m = _CREATE.search(stmt.strip())
-        if not m:
+def _columns(dialect: str, body: str, risks: list[tuple[str, TypeMapping]]) -> list[tuple[str, str]]:
+    out = []
+    for item in _split_top(body):
+        if _CONSTRAINT.match(item):
             continue
+        col_m = re.match(r"([\[\"`]?[\w$#]+[\]\"`]?)\s+(.+)", item, re.S)
+        if not col_m:
+            continue
+        col = re.sub(r"[\[\]\"`]", "", col_m.group(1)).lower()
+        type_str, not_null = _type_end(" " + col_m.group(2).strip())
+        tm = map_type(dialect, type_str)
+        line = f"  `{col}` {tm.delta}{' NOT NULL' if not_null else ''}"
+        if tm.risk != "none":
+            risks.append((col, tm))
+            line += f" COMMENT 'migrated from {tm.source} [{tm.risk}]'"
+        out.append((col, line))
+    return out
+
+
+def convert_ddl(dialect: str, ddl: str, target_table: str | None = None) -> tuple[str, list[tuple[str, TypeMapping]]]:
+    """Translate CREATE TABLE statements (SQL Server, Oracle, Teradata, Hive) into Delta DDL + risk list.
+
+    Hive ``PARTITIONED BY`` columns become regular columns, and the table is clustered by them
+    (liquid clustering) instead of re-creating static partitions.
+    """
+    outputs: list[str] = []
+    risks: list[tuple[str, TypeMapping]] = []
+    pos = 0
+    while m := _CREATE_HEAD.search(ddl, pos):
         name = re.sub(r"[\[\]\"`]", "", m.group(1))
-        cols = []
-        for item in _split_top(m.group(2)):
-            if _CONSTRAINT.match(item):
-                continue
-            col_m = re.match(r"([\[\"`]?[\w$#]+[\]\"`]?)\s+(.+)", item, re.S)
-            if not col_m:
-                continue
-            col = re.sub(r"[\[\]\"`]", "", col_m.group(1)).lower()
-            type_str, not_null = _type_end(" " + col_m.group(2).strip())
-            tm = map_type(dialect, type_str)
-            line = f"  `{col}` {tm.delta}{' NOT NULL' if not_null else ''}"
-            if tm.risk != "none":
-                risks.append((col, tm))
-                line += f" COMMENT 'migrated from {tm.source} [{tm.risk}]'"
-            cols.append(line)
+        body, end = _balanced(ddl, m.end() - 1)
+        nxt = _CREATE_HEAD.search(ddl, end)
+        tail = ddl[end: nxt.start() if nxt else len(ddl)]
+        cols = _columns(dialect, body, risks)
+        cluster: list[str] = []
+        if pm := _PARTITIONED.search(tail):
+            pbody, _ = _balanced(tail, pm.end() - 1)
+            pcols = _columns(dialect, pbody, risks)
+            cols += pcols
+            cluster = [c for c, _ in pcols]
         tbl = target_table or name.lower()
-        outputs.append(f"CREATE TABLE IF NOT EXISTS {tbl} (\n" + ",\n".join(cols) + "\n) USING DELTA\n"
-                       f"TBLPROPERTIES ('migration.source' = '{dialect}:{name}');")
+        stmt = f"CREATE TABLE IF NOT EXISTS {tbl} (\n" + ",\n".join(line for _, line in cols) + "\n) USING DELTA"
+        if cluster:
+            stmt += f"\nCLUSTER BY ({', '.join(cluster)})  -- replaces static PARTITIONED BY"
+        outputs.append(stmt + f"\nTBLPROPERTIES ('migration.source' = '{dialect}:{name}');")
+        pos = end
     return "\n\n".join(outputs), risks

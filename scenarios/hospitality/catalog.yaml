@@ -1,0 +1,38 @@
+tables:
+  - name: hosp.gold.property_daily_kpis
+    certified: true
+    owner: revenue-management-analytics
+    description: Daily hotel performance per property, occupancy, ADR average daily rate and RevPAR revenue per available room.
+    synonyms: [hotel performance, revpar, adr, occupancy, room revenue, rooms sold]
+    columns:
+      - {name: stay_date, type: date}
+      - {name: property_code, type: string}
+      - {name: city, type: string}
+      - {name: rooms_sold, type: bigint}
+      - {name: rooms_available, type: int}
+      - {name: room_revenue, type: "decimal(14,2)"}
+      - {name: occupancy, type: double}
+      - {name: adr, type: "decimal(10,2)"}
+      - {name: revpar, type: "decimal(10,2)"}
+  - name: hosp.gold.dim_property
+    certified: true
+    owner: hospitality-data-eng
+    description: Hotel property dimension with name, city, brand and room inventory.
+    synonyms: [hotels, properties, brands, portfolio]
+    columns:
+      - {name: property_code, type: string}
+      - {name: property_name, type: string}
+      - {name: city, type: string}
+      - {name: brand, type: string}
+      - {name: rooms_available, type: int}
+  - name: hosp.gold.guest_profile
+    certified: true
+    owner: guest-data
+    description: Guest loyalty profile with tier and stay counts.
+    synonyms: [guests, loyalty members, customers]
+    columns:
+      - {name: guest_id, type: string}
+      - {name: loyalty_tier, type: string}
+      - {name: guest_email, type: string, pii: true}
+      - {name: guest_phone, type: string, pii: true}
+      - {name: card_on_file, type: string, pii: true}

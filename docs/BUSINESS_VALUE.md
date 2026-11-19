@@ -84,6 +84,18 @@ for each tool: **who uses it, the scenario, how to adopt it, and which KPI prove
 
 ---
 
+## By industry
+
+| | Telecom | Hospitality | Banking |
+|---|---|---|---|
+| Biggest data risk | Re-rated / duplicated CDRs inflate usage billing and network KPIs | Modified and cancelled stays distort occupancy, ADR and RevPAR | Reversals, duplicates and late events misstate spend, rewards and fraud signals |
+| Compliance driver | Subscriber privacy (MSISDN, IMSI, IMEI, location) | PCI (card on file), GDPR erasure for international guests | PCI-DSS, SOX control totals |
+| Typical migration | Hadoop/Hive/Impala → Delta | On-prem SQL Server → Azure / lakehouse | Oracle/Teradata → Delta |
+| Cost hotspot | Streaming small files, hour-partitioned CDR tables | 100+ property partitions | MERGE-heavy transaction tables |
+| Self-service question | "Where are calls dropping?" | "Which hotel leads on RevPAR?" | "Which segment spends most on travel?" |
+
+Each column is a runnable, tested scenario in [`scenarios/`](../scenarios).
+
 ## How they work together in a real program
 
 ```

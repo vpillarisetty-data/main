@@ -52,6 +52,14 @@ def find_pan(text: str) -> bool:
     return False
 
 
+_IMEI = re.compile(r"(?<!\d)\d{15}(?!\d)")
+
+
+def find_imei(text: str) -> bool:
+    """15-digit device id with a Luhn check digit (3GPP TS 23.003) that is not a card number."""
+    return any(luhn_ok(m) and len(set(m)) > 1 and not _pan_issuer_ok(m) for m in _IMEI.findall(text))
+
+
 def find_ssn(text: str) -> bool:
     for m in _SSN.finditer(text):
         area, group, serial = m.groups()
@@ -95,6 +103,7 @@ DETECTORS: tuple[Detector, ...] = (
     Detector("credit_card", "restricted", find_pan),
     Detector("ssn", "restricted", find_ssn),
     Detector("iban", "restricted", find_iban),
+    Detector("device_id", "confidential", find_imei),
     Detector("email", "confidential", lambda s: bool(_EMAIL.search(s))),
     Detector("phone", "confidential", lambda s: bool(_PHONE.search(s))),
     Detector("ip_address", "confidential", find_ipv4),
@@ -108,11 +117,14 @@ NAME_HINTS: tuple[tuple[re.Pattern[str], str, str], ...] = tuple(
         (r"(card_?num|^pan$|_pan$|cc_?num|primary_account)", "credit_card", "restricted"),
         (r"(cvv|cvc|card_?verif)", "card_security_code", "restricted"),
         (r"(e_?mail)", "email", "confidential"),
-        (r"(phone|mobile|msisdn|cell)", "phone", "confidential"),
+        (r"(phone|mobile|msisdn|cell_?(phone|num|number|no)\b)", "phone", "confidential"),  # not cell_id (towers)
         (r"(^|_)(dob|birth_?date|date_of_birth)($|_)", "date_of_birth", "confidential"),
         (r"(first_?name|last_?name|full_?name|surname|given_name)", "person_name", "confidential"),
         (r"(street|address_line|addr_?1|postal_address|home_address)", "address", "confidential"),
         (r"(passport|driver_?lic|national_id)", "government_id", "restricted"),
         (r"(ip_?addr|client_ip|remote_addr)", "ip_address", "confidential"),
+        (r"(^|_)(msisdn|a_number|b_number|calling_number|called_number)($|_)", "phone", "confidential"),
+        (r"(^|_)(imsi|imei|iccid|device_id)($|_)", "device_id", "confidential"),
+        (r"(loyalty_?(number|id|no)|member_?number)", "loyalty_id", "confidential"),
     )
 )

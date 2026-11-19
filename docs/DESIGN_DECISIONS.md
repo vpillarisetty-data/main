@@ -64,8 +64,16 @@ and what it doesn't do yet.
 **Limitations:** composite-type normalization is JSON-based; no automatic column mapping for renamed columns (pass explicit lists).
 
 ## Cross-cutting
-* **Testing against the real engine** found 5 bugs during development that unit tests alone would have missed:
-  Databricks-only `SELECT * EXCEPT`, an ambiguous column in MERGE, Parquet-by-default tables on OSS Spark, row
-  resurrection after hard deletes, and a PAN validator rejecting valid cards.
+* **Testing against the real engine and real domains** found 10 bugs that unit tests alone would have missed:
+  1. Databricks-only `SELECT * EXCEPT` in generated MERGE (fails on OSS Spark)
+  2. ambiguous delete column inside MERGE
+  3. tables created as Parquet instead of Delta on OSS Spark
+  4. reversed rows resurrected by late replays (fixed with tombstones)
+  5. a PAN validator rejecting valid test cards
+  6. liquid clustering via `ALTER TABLE` failing on tables not created clustered (bundled banking config)
+  7. Doctor losing commit history after a checkpoint (write-pattern rules never fired on real tables)
+  8. telecom `cell_id` classified as a phone number
+  9. eval CLI running banking questions against any catalog
+  10. Hive `PARTITIONED BY` breaking DDL conversion
 * **Dependencies:** the core needs only `pyyaml`; Spark is optional and imported lazily, so the tools run in CI, on laptops
   and in notebooks.

@@ -93,3 +93,24 @@ def test_mask_expressions_execute_in_spark(spark):
     for key, (raw, expected) in cases.items():
         got = spark.sql(f"SELECT {MASK_EXPR[key]} AS m FROM (SELECT '{raw}' AS v)").first().m
         assert got == expected, key
+
+
+@pytest.mark.parametrize("column,expected", [
+    ("cell_id", None),                # telecom: a cell tower, not a phone
+    ("serving_cell", None),
+    ("cell_phone", "phone"),
+    ("cellnumber", "phone"),
+    ("msisdn", "phone"),
+    ("imsi", "device_id"),
+    ("loyalty_number", "loyalty_id"),  # hospitality
+    ("passport_no", "government_id"),
+])
+def test_industry_column_names(column, expected):
+    assert classify_column(column, ["x1", "x2"]).category == expected
+
+
+def test_imei_detected_by_luhn_not_confused_with_cards():
+    imeis = ["356938035643809", "490154203237518", "353918051234563"]
+    c = classify_column("handset", imeis)
+    assert c.category == "device_id"
+    assert not classify_column("handset", ["356938035643808"]).is_pii   # bad check digit

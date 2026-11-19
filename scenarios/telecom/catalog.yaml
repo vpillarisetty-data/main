@@ -1,0 +1,37 @@
+tables:
+  - name: telco.gold.network_usage_daily
+    certified: true
+    owner: network-analytics-eng
+    description: Daily voice and data usage and dropped call KPIs per cell site, with region and technology.
+    synonyms: [network performance, call drops, dropped calls, traffic, usage]
+    columns:
+      - {name: usage_date, type: date}
+      - {name: cell_id, type: string}
+      - {name: region, type: string, description: "Australian state: NSW, VIC, QLD, WA"}
+      - {name: technology, type: string, description: "4G or 5G"}
+      - {name: voice_calls, type: bigint}
+      - {name: voice_minutes, type: double}
+      - {name: data_mb, type: double, description: Mobile data volume in megabytes}
+      - {name: dropped_calls, type: bigint}
+      - {name: drop_rate, type: double}
+  - name: telco.gold.dim_cell
+    certified: true
+    owner: network-engineering
+    description: Cell site dimension with site name, region and radio technology.
+    synonyms: [towers, sites, base stations]
+    columns:
+      - {name: cell_id, type: string}
+      - {name: site_name, type: string}
+      - {name: region, type: string}
+      - {name: technology, type: string}
+  - name: telco.gold.subscriber_profile
+    certified: true
+    owner: customer-data
+    description: Mobile subscriber plan, home region and tenure.
+    synonyms: [customers, subscribers, plans, churn]
+    columns:
+      - {name: msisdn, type: string, pii: true, description: mobile number}
+      - {name: imsi, type: string, pii: true}
+      - {name: plan, type: string}
+      - {name: home_region, type: string}
+      - {name: tenure_months, type: int}
