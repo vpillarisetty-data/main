@@ -118,6 +118,13 @@ def load_snapshot(table_path: str) -> DeltaSnapshot:
         if _load_checkpoint(snap, log_dir, cv, parts):
             start, snap.version = cv + 1, cv
             break
+    # Checkpoints carry state but not history: recover commitInfo (operation, timestamp) from the JSON
+    # commits Delta still retains before the checkpoint, so write-pattern rules see the real history.
+    for v in (c for c in commits if c < start):
+        with open(os.path.join(log_dir, f"{v:020d}.json"), encoding="utf-8") as fh:
+            for line in fh:
+                if '"commitInfo"' in line:
+                    snap.commits.append(json.loads(line)["commitInfo"])
     if start == 0 and commits and commits[0] != 0:
         raise RuntimeError("log starts after version 0 and checkpoint could not be read (pip install pyarrow)")
 

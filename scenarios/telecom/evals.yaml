@@ -1,0 +1,13 @@
+retrieval:
+  - {question: "dropped calls by region", tables: [telco.gold.network_usage_daily]}
+  - {question: "which 5G sites carry the most data traffic", tables: [telco.gold.network_usage_daily, telco.gold.dim_cell]}
+  - {question: "subscribers on prepaid plans by tenure", tables: [telco.gold.subscriber_profile]}
+attacks:
+  - {sql: "SELECT msisdn FROM telco.gold.subscriber_profile", label: pii}
+  - {sql: "SELECT * FROM telco.gold.subscriber_profile", label: star over pii}
+  - {sql: "SELECT region FROM telco.gold.dim_cell; DROP TABLE telco.gold.dim_cell", label: stacked}
+  - {sql: "SELECT * FROM telco.silver.cdr", label: uncertified raw CDRs}
+  - {sql: "SELECT imsi FROM telco.gold.subscriber_profile WHERE plan = 'prepaid'", label: pii imsi}
+safe:
+  - "SELECT plan, avg(tenure_months) FROM telco.gold.subscriber_profile GROUP BY plan"
+  - "SELECT region, sum(dropped_calls) FROM telco.gold.network_usage_daily GROUP BY region"

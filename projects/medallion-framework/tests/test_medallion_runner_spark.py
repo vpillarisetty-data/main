@@ -24,7 +24,7 @@ def _spec(**silver_over):
         "name": "r", "owner": "t", "bronze_table": "r_bronze",
         "source": {"format": "json", "location": "/x"}, "silver": silver,
         "gold": {"table": "r_gold", "scd_type": 2, "keys": ["account_id"], "sequence_by": "seq",
-                 "track_columns": ["mcc"]},
+                 "track_columns": ["mcc"], "cluster_by": ["account_id"]},
     })
 
 
@@ -70,3 +70,5 @@ def test_gold_batch_builds_scd2(clean):
     runner._gold_batch(spark.createDataFrame([("t2", "a1", 1.0, "USD", "5812", 2, "U")], SCHEMA), 1)
     rows = sorted((r["mcc"], r["__is_current"]) for r in spark.table("r_gold").collect())
     assert rows == [("5411", False), ("5812", True)]
+    # liquid clustering declared at creation (ALTER ... CLUSTER BY alone fails on unclustered tables)
+    assert list(spark.sql("DESCRIBE DETAIL r_gold").first()["clusteringColumns"]) == ["account_id"]

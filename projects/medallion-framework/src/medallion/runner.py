@@ -143,9 +143,16 @@ class MedallionRunner:
                     f"CAST(NULL AS {dict(batch.dtypes)[gold.sequence_by]}) AS __end_at",
                     "CAST(NULL AS boolean) AS __is_current",
                 )
-            empty.write.format("delta").saveAsTable(gold.table)
-            if gold.cluster_by:  # liquid clustering instead of static partitioning
-                spark.sql(f"ALTER TABLE {gold.table} CLUSTER BY ({', '.join(gold.cluster_by)})")
+            if gold.cluster_by:
+                # liquid clustering must be declared at creation (ALTER ... CLUSTER BY only works on
+                # tables that already have clustering enabled)
+                empty.createOrReplaceTempView(f"_gold_empty_{self.spec.name}")
+                spark.sql(
+                    f"CREATE TABLE {gold.table} USING delta CLUSTER BY ({', '.join(gold.cluster_by)}) "
+                    f"AS SELECT * FROM _gold_empty_{self.spec.name}"
+                )
+            else:
+                empty.write.format("delta").saveAsTable(gold.table)
         sql = builder.scd2(view, gold.track_columns) if gold.scd_type == 2 else builder.scd1(view)
         spark.sql(sql)
 

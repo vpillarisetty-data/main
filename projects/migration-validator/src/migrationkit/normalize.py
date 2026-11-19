@@ -115,14 +115,18 @@ def diagnose(source: str, target: str) -> str:
         x, y = Decimal(source), Decimal(target)
         if x != 0 and abs(x - y) / abs(x) < Decimal("1e-6"):
             return "floating-point rounding: lower float_decimals or migrate as DECIMAL"
-        if x == y.scaleb(2) or y == x.scaleb(2) or x == y.scaleb(-2) or y == x.scaleb(-2):
-            return "off by 100x: units mismatch (cents vs dollars?)"
+        for k in range(1, 7):
+            if x != 0 and (x == y.scaleb(k) or y == x.scaleb(k)):
+                hint = {2: "cents vs dollars?", 3: "ms vs s, or KB vs MB?", 6: "bytes vs MB?"}.get(k, "unit scale?")
+                return f"off by {10 ** k:g}x: units mismatch ({hint})"
         if x.copy_abs() == y.copy_abs():
             return "sign flipped: debit/credit convention"
     except (InvalidOperation, ValueError):
         pass
     if source == NULL or target == NULL:
         return "value lost (NULL on one side): check join/lookup in the migrated pipeline"
+    if len(target) == 10 and source[:10] == target and parse_canonical_ts(source):
+        return "time part dropped: timestamp loaded into a DATE column (Oracle DATE mapped to DATE?)"
     if len(target) < len(source) and source.startswith(target):
         return "truncated: target column too short or substring in transform"
     return "value differs"

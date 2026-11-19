@@ -1,0 +1,17 @@
+# "Simplify" proposal: money as DOUBLE and an hourly instead of 60-minute refresh promise.
+id: hospitality.property_daily_kpis
+version: 1.1.0
+owner: revenue-management-analytics
+dataset: hosp.gold.property_daily_kpis
+description: Occupancy, ADR and RevPAR per hotel per stay night (cancelled stays excluded).
+sla: {freshness_minutes: 120, completeness_pct: 99.9}
+schema:
+  - {name: stay_date,       type: date,   nullable: false}
+  - {name: property_code,   type: string, nullable: false}
+  - {name: city,            type: string, nullable: false}
+  - {name: rooms_sold,      type: bigint, nullable: false}
+  - {name: rooms_available, type: int,    nullable: false}
+  - {name: room_revenue,    type: "decimal(16,2)", nullable: false}
+  - {name: occupancy,       type: double, nullable: false}
+  - {name: adr,             type: double, nullable: false}
+  - {name: revpar,          type: "decimal(10,2)", nullable: false}
