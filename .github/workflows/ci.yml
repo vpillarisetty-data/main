@@ -31,6 +31,26 @@ jobs:
       - run: pip install "pyspark==3.5.3" "delta-spark==3.2.1" pyarrow pyyaml pytest
       - run: python -m pytest -rs
 
+  install-smoke:
+    name: clean install of every package + CLIs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install ./projects/*
+      - name: run every CLI from outside the repo
+        working-directory: /tmp
+        run: |
+          python -c "import medallion, streamguard, contractkit, deltadoctor, piiguard, catalog_agent, migrationkit"
+          medallion-run $GITHUB_WORKSPACE/projects/medallion-framework/conf/pipelines/card_transactions.yaml --validate-only
+          contractkit ddl $GITHUB_WORKSPACE/projects/data-contracts/contracts/customer_rewards.v1.yaml
+          piiguard $GITHUB_WORKSPACE/projects/pii-guardian/examples/customer_sample.jsonl --table a.b.c > /dev/null
+          migrationkit convert-ddl --from oracle $GITHUB_WORKSPACE/projects/migration-validator/examples/oracle_schema.sql
+          migrationkit demo > /dev/null
+          catalog-agent-demo
+          deltadoctor --help
+
   agent-evals:
     name: GenAI guardrail evals
     runs-on: ubuntu-latest
