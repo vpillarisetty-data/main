@@ -5,7 +5,7 @@ late and duplicate events, silent upstream breaks, migrations that don't reconci
 PII leaks, and GenAI-on-data that can't pass a security review.
 
 [![ci](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
-&nbsp; `Spark 3.5 + Delta 3.2 integration tests` · `GenAI red-team evals` · `7 pip-installable packages` · `ruff clean`
+&nbsp; `132 tests` · `Spark 3.5 + Delta 3.2 integration tests` · `GenAI red-team evals` · `7 pip-installable packages` · `ruff clean`
 
 Every project ships its own package and command-line tool. Every claim in the READMEs is backed by a test, and the
 Spark tests run against **real Delta tables**.
