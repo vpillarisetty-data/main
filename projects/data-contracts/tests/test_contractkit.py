@@ -2,7 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from contractkit import Severity, diff_contracts, load_contract, parse_contract, semver_violation, validate_records
+from contractkit import (
+    Severity,
+    diff_contracts,
+    load_contract,
+    parse_contract,
+    semver_violation,
+    validate_records,
+)
 from contractkit.cli import main
 from contractkit.model import ContractError
 
