@@ -1,0 +1,14 @@
+id: rewards.customer_points
+version: 1.4.0
+owner: rewards-data-products
+dataset: rewards.gold.customer_points
+description: Daily rewards points balance per customer account.
+sla:
+  freshness_minutes: 60
+  completeness_pct: 99.9
+schema:
+  - {name: account_id,   type: string, nullable: false, unique: true, pii: true, description: Tokenized account id}
+  - {name: tier,         type: string, nullable: false, enum: [green, gold, platinum]}
+  - {name: points,       type: int,    nullable: false}
+  - {name: points_value, type: "decimal(12,2)", description: USD value of points}
+  - {name: as_of_date,   type: date,   nullable: false}
