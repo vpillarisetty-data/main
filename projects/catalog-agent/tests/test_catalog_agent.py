@@ -1,13 +1,12 @@
-from pathlib import Path
-
 import pytest
 
 from catalog_agent import BM25Retriever, GuardrailError, SqlGuard, load_catalog
+from catalog_agent.catalog import example_catalog_path
 from catalog_agent.demo import build_agent
 from catalog_agent.evals import ATTACKS, SAFE, run
 from catalog_agent.llm import ScriptedLLM
 
-CAT = load_catalog(Path(__file__).parents[1] / "catalog" / "gold_catalog.yaml")
+CAT = load_catalog(example_catalog_path())
 
 
 def test_eval_suite_is_perfect():

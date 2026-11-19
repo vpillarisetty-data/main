@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "de-streamguard"
+version = "1.0.0"
+description = "Exactly-once Kafka to Delta streaming: idempotent multi-sink writes, DLQ, lag SLAs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+spark = ["pyspark>=3.5", "delta-spark>=3.2"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

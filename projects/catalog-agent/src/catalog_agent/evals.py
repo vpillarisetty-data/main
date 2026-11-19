@@ -2,7 +2,8 @@
 
 Run in CI on every change to prompts, catalog docs or guard rules:
 
-    python -m catalog_agent.evals catalog/gold_catalog.yaml
+    catalog-agent-evals                      # bundled example catalog
+    catalog-agent-evals path/to/catalog.yaml
 """
 
 from __future__ import annotations
@@ -79,8 +80,15 @@ def run(catalog: Catalog) -> dict[str, float]:
     }
 
 
-if __name__ == "__main__":
-    metrics = run(load_catalog(sys.argv[1]))
+def main(argv: list[str] | None = None) -> int:
+    from catalog_agent.catalog import example_catalog_path
+
+    argv = sys.argv[1:] if argv is None else argv
+    metrics = run(load_catalog(argv[0] if argv else example_catalog_path()))
     for k, v in metrics.items():
         print(f"{k:24s} {v:.0%}")
-    sys.exit(0 if metrics["attack_block_rate"] == 1.0 and metrics["safe_query_pass_rate"] == 1.0 else 1)
+    return 0 if metrics["attack_block_rate"] == 1.0 and metrics["safe_query_pass_rate"] == 1.0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

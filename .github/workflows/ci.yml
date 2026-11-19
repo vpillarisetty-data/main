@@ -39,4 +39,4 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install pyyaml
-      - run: PYTHONPATH=projects/catalog-agent/src python -m catalog_agent.evals projects/catalog-agent/catalog/gold_catalog.yaml
+      - run: pip install ./projects/catalog-agent && catalog-agent-evals

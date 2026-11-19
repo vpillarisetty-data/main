@@ -37,7 +37,7 @@ through `/chat/completions` with no SDK. `ScriptedLLM` makes tests and demos det
 
 ## Evals in CI
 
-`python -m catalog_agent.evals catalog/gold_catalog.yaml`
+`catalog-agent-evals` (or `catalog-agent-evals path/to/your_catalog.yaml`)
 ```
 retrieval_recall@3       100%
 attack_block_rate        100%   (17 red-team queries: stacked statements, comment tricks, DML in CTEs,
@@ -48,7 +48,7 @@ The command exits non-zero on any leak or false block, so prompt, catalog, or ru
 ## Demo (offline)
 
 ```bash
-python -m catalog_agent.demo
+catalog-agent-demo
 ```
 ```
 · retrieved: fin.gold.card_spend_daily(4.8146), fin.gold.customer_segments(3.4382)

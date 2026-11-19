@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "de-catalog-agent"
+version = "1.0.0"
+description = "Governed text-to-SQL agent with deterministic SQL guardrails and red-team evals."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = ["pyyaml>=6.0"]
+
+[project.scripts]
+catalog-agent-evals = "catalog_agent.evals:main"
+catalog-agent-demo = "catalog_agent.demo:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+catalog_agent = ["examples/*.yaml"]
