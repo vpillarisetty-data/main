@@ -118,3 +118,18 @@ def test_real_delta_table_from_spark(spark, tmp_path):
     assert len(snap.files) == 60 and snap.files[next(iter(snap.files))].num_records is not None
     ids = {f.id for f in diagnose(snap).findings}
     assert "small_files" in ids
+
+
+def test_real_table_with_checkpoint(spark, tmp_path):
+    """>10 commits makes Delta write a parquet checkpoint; replay must start from it."""
+    pytest.importorskip("pyarrow")
+    path = str(tmp_path / "ckpt")
+    for i in range(15):
+        spark.range(i * 5, i * 5 + 5, numPartitions=1).write.format("delta").mode("append").save(path)
+    spark.sql(f"DELETE FROM delta.`{path}` WHERE id < 5")
+    import os
+    assert any(".checkpoint" in n for n in os.listdir(os.path.join(path, "_delta_log")))
+    snap = load_snapshot(path)
+    assert snap.version == 15
+    assert sum(f.num_records for f in snap.files.values()) == spark.read.format("delta").load(path).count()
+    assert len(snap.tombstones) == 1
