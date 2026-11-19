@@ -1,0 +1,42 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    name: unit + lint (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install pyyaml pytest ruff
+      - run: ruff check projects conftest.py
+      - run: python -m pytest   # Spark tests auto-skip here
+
+  spark-integration:
+    name: Spark + Delta integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: "17"}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install "pyspark==3.5.3" "delta-spark==3.2.1" pyarrow pyyaml pytest
+      - run: python -m pytest -rs
+
+  agent-evals:
+    name: GenAI guardrail evals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pyyaml
+      - run: PYTHONPATH=projects/catalog-agent/src python -m catalog_agent.evals projects/catalog-agent/catalog/gold_catalog.yaml

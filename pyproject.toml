@@ -1,0 +1,37 @@
+[project]
+name = "data-engineering-accelerators"
+version = "1.0.0"
+description = "Production-grade, reusable data engineering accelerators for Lakehouse platforms."
+requires-python = ">=3.10"
+dependencies = ["pyyaml>=6.0"]
+
+[project.optional-dependencies]
+spark = ["pyspark>=3.5,<4.1", "delta-spark>=3.2"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+addopts = "-q --import-mode=importlib"
+testpaths = ["projects"]
+pythonpath = [
+  "projects/medallion-framework/src",
+  "projects/streaming-exactly-once/src",
+  "projects/data-contracts/src",
+  "projects/delta-table-doctor/src",
+  "projects/pii-guardian/src",
+  "projects/catalog-agent/src",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501", "SIM905"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["medallion", "streamguard", "contractkit", "deltadoctor", "piiguard", "catalog_agent"]
+
+[tool.ruff.lint.per-file-ignores]
+"projects/*/deploy/*.py" = ["I001"]
+"projects/*/local/*.py" = ["I001"]

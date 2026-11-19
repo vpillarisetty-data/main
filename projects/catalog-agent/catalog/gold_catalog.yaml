@@ -1,0 +1,47 @@
+# In production this is generated from Unity Catalog information_schema + table/column comments + tags.
+tables:
+  - name: fin.gold.card_spend_daily
+    certified: true
+    owner: payments-data-eng
+    description: Daily card spend aggregated by account, merchant category and country. One row per account per day per mcc.
+    synonyms: [spending, purchases, transactions volume, card usage]
+    sample_questions: ["total spend by merchant category last month", "top spending countries"]
+    columns:
+      - {name: spend_date, type: date, description: Calendar date of the transactions}
+      - {name: account_id, type: string, description: Tokenized account identifier}
+      - {name: mcc_group, type: string, description: "Merchant category group e.g. travel, dining, grocery"}
+      - {name: country, type: string, description: ISO country of the merchant}
+      - {name: spend_usd, type: "decimal(18,2)", description: Total spend in USD}
+      - {name: txn_count, type: int, description: Number of transactions}
+
+  - name: fin.gold.customer_segments
+    certified: true
+    owner: marketing-analytics
+    description: Current customer segment and tenure for each account holder.
+    synonyms: [customers, cardmembers, segmentation, cohort]
+    columns:
+      - {name: account_id, type: string, description: Tokenized account identifier}
+      - {name: segment, type: string, description: "mass, affluent or hnw"}
+      - {name: tenure_years, type: int, description: Years since account opening}
+      - {name: full_name, type: string, pii: true}
+      - {name: email, type: string, pii: true}
+
+  - name: fin.gold.rewards_points_balance
+    certified: true
+    owner: rewards-data-products
+    description: Rewards points balance and points earned per account as of each month end.
+    synonyms: [loyalty, membership rewards, points]
+    columns:
+      - {name: as_of_month, type: date}
+      - {name: account_id, type: string}
+      - {name: points_balance, type: bigint, description: Points available at month end}
+      - {name: points_earned, type: bigint, description: Points earned during the month}
+
+  - name: fin.silver.card_txn
+    certified: false
+    owner: payments-data-eng
+    description: Raw-ish card transactions, not certified for self-service.
+    columns:
+      - {name: txn_id, type: string}
+      - {name: card_number, type: string, pii: true}
+      - {name: amount, type: "decimal(18,2)"}

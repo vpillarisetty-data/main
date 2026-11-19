@@ -1,0 +1,39 @@
+# Databricks Asset Bundle: `databricks bundle deploy -t prod`
+bundle:
+  name: medallion-framework
+
+variables:
+  spec:
+    default: conf/pipelines/card_transactions.yaml
+
+resources:
+  jobs:
+    card_transactions_medallion:
+      name: card_transactions_medallion
+      schedule:
+        quartz_cron_expression: "0 0/15 * * * ?"
+        timezone_id: UTC
+      email_notifications:
+        on_failure: [payments-data-eng@example.com]
+      tasks:
+        - task_key: bronze
+          python_wheel_task: {package_name: medallion, entry_point: run, parameters: ["${var.spec}", "--layer", "bronze"]}
+          environment_key: default
+        - task_key: silver
+          depends_on: [{task_key: bronze}]
+          python_wheel_task: {package_name: medallion, entry_point: run, parameters: ["${var.spec}", "--layer", "silver"]}
+          environment_key: default
+        - task_key: gold
+          depends_on: [{task_key: silver}]
+          python_wheel_task: {package_name: medallion, entry_point: run, parameters: ["${var.spec}", "--layer", "gold"]}
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec: {client: "2", dependencies: ["../dist/*.whl"]}
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production

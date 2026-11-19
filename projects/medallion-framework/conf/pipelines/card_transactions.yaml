@@ -1,0 +1,49 @@
+# Card-transaction feed: JSON files land in cloud storage, arrive out of order,
+# and carry reversals (op = 'D') that must cancel the original authorization.
+name: card_transactions
+owner: payments-data-eng
+tags:
+  domain: transactions
+  pii: "true"
+  sla_minutes: "15"
+checkpoint_root: /Volumes/fin/ops/checkpoints
+
+source:
+  format: json
+  location: /Volumes/fin/landing/card_txn/
+  schema_hints: "amount DECIMAL(18,2), event_ts TIMESTAMP, seq BIGINT"
+  options:
+    cloudFiles.maxFilesPerTrigger: 500
+
+bronze_table: fin.bronze.card_txn_raw
+
+silver:
+  table: fin.silver.card_txn
+  keys: [txn_id]
+  sequence_by: seq
+  delete_condition: "op = 'D'"
+  quarantine_table: fin.silver.card_txn_quarantine
+  select:
+    - txn_id
+    - account_id
+    - CAST(amount AS DECIMAL(18,2)) AS amount
+    - upper(currency) AS currency
+    - merchant_id
+    - mcc
+    - event_ts
+    - seq
+    - op
+  expectations:
+    - {name: txn_id_present,   expr: "txn_id IS NOT NULL",                     action: fail}
+    - {name: valid_currency,   expr: "currency RLIKE '^[A-Z]{3}$'",            action: quarantine}
+    - {name: amount_in_range,  expr: "abs(amount) < 1000000",                  action: quarantine}
+    - {name: not_future_dated, expr: "event_ts <= current_timestamp() + INTERVAL 5 MINUTES", action: drop}
+    - {name: has_merchant,     expr: "merchant_id IS NOT NULL",                action: warn}
+
+gold:
+  table: fin.gold.dim_account_latest_txn
+  scd_type: 2
+  keys: [account_id]
+  sequence_by: seq
+  track_columns: [merchant_id, mcc]
+  cluster_by: [account_id]
