@@ -55,6 +55,11 @@ class Catalog:
         return [t for t in self.tables.values() if t.certified]
 
 
+def example_catalog_path() -> Path:
+    """Sample card-payments catalog shipped with the package (used by the demo and evals)."""
+    return Path(__file__).parent / "examples" / "gold_catalog.yaml"
+
+
 def load_catalog(path: str | Path) -> Catalog:
     with open(path, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)

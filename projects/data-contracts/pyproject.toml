@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "de-contractkit"
+version = "1.0.0"
+description = "Data contracts as code with consumer-centric breaking-change detection and CI gate."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = ["pyyaml>=6.0"]
+
+[project.scripts]
+contractkit = "contractkit.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

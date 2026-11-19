@@ -1,13 +1,5 @@
-[project]
-name = "data-engineering-accelerators"
-version = "1.0.0"
-description = "Production-grade, reusable data engineering accelerators for Lakehouse platforms."
-requires-python = ">=3.10"
-dependencies = ["pyyaml>=6.0"]
-
-[project.optional-dependencies]
-spark = ["pyspark>=3.5,<4.1", "delta-spark>=3.2"]
-dev = ["pytest>=8", "ruff>=0.6"]
+# Workspace configuration only. Each project under projects/ is its own installable package
+# (see projects/<name>/pyproject.toml); `make install` installs them all in editable mode.
 
 [tool.pytest.ini_options]
 addopts = "-q --import-mode=importlib"

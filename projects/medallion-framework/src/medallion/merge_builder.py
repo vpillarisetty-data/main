@@ -5,8 +5,9 @@ Solves the problems that break naive upserts in financial pipelines:
 * **Out-of-order / late-arriving events** - updates only apply when the incoming
   ``sequence_by`` value is newer than what is stored, so a late event can never
   overwrite a newer one.
-* **Reversals / deletes** - a ``delete_condition`` (e.g. ``op = 'D'``) turns the
-  row into a delete instead of an upsert, again guarded by sequence.
+* **Reversals / deletes** - a ``delete_condition`` (e.g. ``op = 'D'``) becomes a
+  sequence-guarded **tombstone**, so a late or replayed older insert cannot resurrect
+  the row, and a delete that overtakes its own insert still wins.
 * **Duplicate keys inside one micro-batch** - MERGE fails if several source rows
   match the same target row, so the source is reduced to the latest row per key
   first (``dedup_source_sql``).
@@ -63,21 +64,53 @@ class MergeBuilder:
         )
 
     # ---------- SCD 1 ----------
-    def scd1(self, source_view: str, delete_condition: str | None = None) -> str:
-        set_clause = ",\n    ".join(f"t.{_q(c)} = s.{_q(c)}" for c in self.columns)
+    def scd1(self, source_view: str, delete_condition: str | None = None, delete_mode: str = "soft") -> str:
+        """Upsert latest state per key.
+
+        ``delete_mode="soft"`` (default) keeps a **tombstone** row (``__deleted = true``) carrying the
+        delete's sequence number. A hard DELETE forgets the key entirely, so an older insert arriving
+        later (late data, a replay, or a delete that overtook its insert) would resurrect the row.
+        Tombstones block that; purge them with :meth:`purge_tombstones_sql` after the lateness window.
+        Consumers read through :meth:`current_view_sql`.
+        """
+        if delete_mode not in ("soft", "hard"):
+            raise ValueError("delete_mode must be 'soft' or 'hard'")
         cols = ", ".join(_q(c) for c in self.columns)
         vals = ", ".join(f"s.{_q(c)}" for c in self.columns)
+        set_clause = ",\n    ".join(f"t.{_q(c)} = s.{_q(c)}" for c in self.columns)
         lines = [
             f"MERGE INTO {self.target} AS t",
             f"USING ({self.dedup_source_sql(source_view, delete_condition)}) AS s",
             f"ON {self._on()}",
         ]
+        if delete_condition and delete_mode == "soft":
+            lines.append(
+                f"WHEN MATCHED AND {self._newer()} THEN UPDATE SET\n    {set_clause},\n"
+                f"    t.`__deleted` = s.`__is_delete`, t.`__updated_at` = current_timestamp()"
+            )
+            lines.append(
+                f"WHEN NOT MATCHED THEN INSERT ({cols}, `__deleted`, `__updated_at`) "
+                f"VALUES ({vals}, s.`__is_delete`, current_timestamp())"
+            )
+            return "\n".join(lines)
         if delete_condition:
             lines.append(f"WHEN MATCHED AND s.`__is_delete` AND {self._newer()} THEN DELETE")
         lines.append(f"WHEN MATCHED AND {self._newer()} THEN UPDATE SET\n    {set_clause}")
         not_deleted = " AND NOT s.`__is_delete`" if delete_condition else ""
         lines.append(f"WHEN NOT MATCHED{not_deleted} THEN INSERT ({cols}) VALUES ({vals})")
         return "\n".join(lines)
+
+    def current_view_sql(self, view: str) -> str:
+        """Consumer-facing view that hides tombstones."""
+        cols = ", ".join(_q(c) for c in self.columns)
+        return f"CREATE OR REPLACE VIEW {view} AS SELECT {cols} FROM {self.target} WHERE NOT `__deleted`"
+
+    def purge_tombstones_sql(self, retention_days: int) -> str:
+        """Run on a schedule; ``retention_days`` must exceed the maximum expected event lateness."""
+        return (
+            f"DELETE FROM {self.target} WHERE `__deleted` "
+            f"AND `__updated_at` < current_timestamp() - INTERVAL {int(retention_days)} DAYS"
+        )
 
     # ---------- SCD 2 ----------
     def scd2(self, source_view: str, track_columns: Sequence[str]) -> str:

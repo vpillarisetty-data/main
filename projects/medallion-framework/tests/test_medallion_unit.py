@@ -59,13 +59,21 @@ def test_suite_predicates():
     assert "filter(array(" in suite.reasons_column_sql()
 
 
-def test_scd1_merge_has_sequence_guard_and_delete():
+def test_scd1_soft_delete_sql():
     sql = MergeBuilder("t1", ["id"], "seq", ["id", "v", "seq", "op"]).scd1("src", "op = 'D'")
     assert "coalesce((op = 'D'), false) AS `__is_delete`" in sql
-    assert "WHEN MATCHED AND s.`__is_delete` AND s.`seq` > t.`seq` THEN DELETE" in sql
+    assert "t.`__deleted` = s.`__is_delete`" in sql          # tombstone, not DELETE
+    assert "THEN DELETE" not in sql
     assert "WHEN MATCHED AND s.`seq` > t.`seq` THEN UPDATE" in sql
-    assert "WHEN NOT MATCHED AND NOT s.`__is_delete` THEN INSERT" in sql
     assert "row_number() OVER (PARTITION BY `id` ORDER BY `seq` DESC)" in sql
+
+
+def test_scd1_hard_delete_sql():
+    sql = MergeBuilder("t1", ["id"], "seq", ["id", "v", "seq", "op"]).scd1("src", "op = 'D'", delete_mode="hard")
+    assert "WHEN MATCHED AND s.`__is_delete` AND s.`seq` > t.`seq` THEN DELETE" in sql
+    assert "WHEN NOT MATCHED AND NOT s.`__is_delete` THEN INSERT" in sql
+    with pytest.raises(ValueError):
+        MergeBuilder("t1", ["id"], "seq", ["id", "seq"]).scd1("src", delete_mode="nope")
 
 
 def test_merge_builder_validates_columns():

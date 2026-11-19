@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "de-deltadoctor"
+version = "1.0.0"
+description = "Delta Lake table health and cost diagnostics straight from the transaction log."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+
+[project.scripts]
+deltadoctor = "deltadoctor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

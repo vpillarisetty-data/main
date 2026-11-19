@@ -94,18 +94,22 @@ class MedallionRunner:
                 (
                     scored.where(suite.quarantine_predicate())
                     .selectExpr("*", f"{batch_id} AS _batch_id", "current_timestamp() AS _quarantined_at")
-                    .write.mode("append").option("mergeSchema", "true")
+                    .write.format("delta").mode("append").option("mergeSchema", "true")
                     .saveAsTable(silver.quarantine_table)
                 )
             clean = scored.where(suite.keep_predicate()).drop("_dq_violations")
+            builder = MergeBuilder(silver.table, silver.keys, silver.sequence_by, clean.columns)
             if not spark.catalog.tableExists(silver.table):
-                clean.limit(0).write.saveAsTable(silver.table)
+                empty = clean.limit(0)
+                if silver.delete_condition:  # tombstone bookkeeping columns
+                    empty = empty.selectExpr("*", "CAST(NULL AS boolean) AS __deleted",
+                                             "CAST(NULL AS timestamp) AS __updated_at")
+                empty.write.format("delta").saveAsTable(silver.table)
+                if silver.delete_condition:
+                    spark.sql(builder.current_view_sql(f"{silver.table}_current"))
             view = f"_silver_src_{self.spec.name}"
             clean.createOrReplaceTempView(view)
-            sql = MergeBuilder(silver.table, silver.keys, silver.sequence_by, clean.columns).scd1(
-                view, silver.delete_condition
-            )
-            spark.sql(sql)
+            spark.sql(builder.scd1(view, silver.delete_condition))
         finally:
             scored.unpersist()
 
@@ -124,6 +128,8 @@ class MedallionRunner:
         gold = self.spec.gold
         assert gold is not None
         spark = batch.sparkSession
+        if "__deleted" in batch.columns:
+            batch = batch.where("NOT __deleted")
         cols = [c for c in batch.columns if not c.startswith("_")]
         batch = batch.select(*cols)
         view = f"_gold_src_{self.spec.name}"
@@ -137,7 +143,7 @@ class MedallionRunner:
                     f"CAST(NULL AS {dict(batch.dtypes)[gold.sequence_by]}) AS __end_at",
                     "CAST(NULL AS boolean) AS __is_current",
                 )
-            empty.write.saveAsTable(gold.table)
+            empty.write.format("delta").saveAsTable(gold.table)
             if gold.cluster_by:  # liquid clustering instead of static partitioning
                 spark.sql(f"ALTER TABLE {gold.table} CLUSTER BY ({', '.join(gold.cluster_by)})")
         sql = builder.scd2(view, gold.track_columns) if gold.scd_type == 2 else builder.scd1(view)
@@ -165,17 +171,25 @@ class MedallionRunner:
 def main(argv: list[str] | None = None) -> None:  # pragma: no cover - Databricks entrypoint
     import argparse
 
-    from pyspark.sql import SparkSession
-
     from medallion.spec import load_spec
 
     ap = argparse.ArgumentParser(description="Run a Medallion pipeline spec")
     ap.add_argument("spec")
     ap.add_argument("--layer", choices=["bronze", "silver", "gold", "all"], default="all")
     ap.add_argument("--continuous", action="store_true")
+    ap.add_argument("--validate-only", action="store_true", help="parse and validate the spec, then exit")
     args = ap.parse_args(argv)
+    spec = load_spec(args.spec)
+    if args.validate_only:
+        print(f"spec '{spec.name}' is valid: {spec.bronze_table} -> {spec.silver.table}"
+              f"{' -> ' + spec.gold.table if spec.gold else ''}")
+        return
+    try:
+        from pyspark.sql import SparkSession
+    except ImportError:
+        raise SystemExit("pyspark is required to run pipelines: pip install 'de-medallion[spark]'") from None
     logging.basicConfig(level=logging.INFO)
-    runner = MedallionRunner(SparkSession.builder.getOrCreate(), load_spec(args.spec), args.continuous)
+    runner = MedallionRunner(SparkSession.builder.getOrCreate(), spec, args.continuous)
     {"bronze": runner.run_bronze, "silver": runner.run_silver, "gold": runner.run_gold, "all": runner.run}[
         args.layer
     ]()

@@ -8,13 +8,10 @@ Swap ScriptedLLM for OpenAICompatibleLLM(model=...) to use a real model.
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 
 from catalog_agent.agent import CatalogAgent, sqlite_executor
-from catalog_agent.catalog import load_catalog
+from catalog_agent.catalog import example_catalog_path, load_catalog
 from catalog_agent.llm import ScriptedLLM
-
-CATALOG = Path(__file__).parents[2] / "catalog" / "gold_catalog.yaml"
 
 
 def seed(conn: sqlite3.Connection) -> None:
@@ -34,7 +31,7 @@ def seed(conn: sqlite3.Connection) -> None:
 def build_agent(llm) -> CatalogAgent:
     conn = sqlite3.connect(":memory:")
     seed(conn)
-    return CatalogAgent(load_catalog(CATALOG), llm, sqlite_executor(conn))
+    return CatalogAgent(load_catalog(example_catalog_path()), llm, sqlite_executor(conn))
 
 
 def main() -> None:
